@@ -128,7 +128,7 @@ def test_trainer_checkpoint_rejects_unexpected_extra_parameters(tmp_path):
 
     new_model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
     new_trainer = PINNTrainer(model=new_model)
-    with pytest.raises(ValueError, match="checkpoint contains extra parameters"):
+    with pytest.raises(ValueError, match="Checkpoint contains extra parameters"):
         new_trainer.load_checkpoint(checkpoint_path)
 
 
@@ -143,7 +143,7 @@ def test_trainer_checkpoint_rejects_missing_extra_parameters(tmp_path):
         model=new_model,
         extra_parameters=[extra_parameter],
     )
-    with pytest.raises(ValueError, match="current trainer has extra parameters"):
+    with pytest.raises(ValueError, match="Current trainer has extra parameters"):
         new_trainer.load_checkpoint(checkpoint_path)
 
 
