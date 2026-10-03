@@ -169,7 +169,10 @@ class Consolidation1DProblem:
         generator = _rng(self.seed) if rng is None else rng
         left_count = (count + 1) // 2
         right_count = count - left_count
-        times = generator.uniform(self.t_min, self.time_max, size=count)
+        # Avoid the initial-condition surface: spatial conditions apply only
+        # for t_hat > 0, while the initial sampler owns t_hat == 0.
+        positive_time_min = np.nextafter(self.t_min, self.time_max)
+        times = generator.uniform(positive_time_min, self.time_max, size=count)
         points = np.empty((count, 2), dtype=np.float64)
         points[:left_count, 0] = self.x_min
         points[:left_count, 1] = times[:left_count]
