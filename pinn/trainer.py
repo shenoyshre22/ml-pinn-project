@@ -201,7 +201,34 @@ class PINNTrainer:
         self.model.load_state_dict(checkpoint["model_state_dict"])
         if "history" in checkpoint:
             self.history = checkpoint["history"]
-        if "extra_params" in checkpoint and self.extra_parameters:
-            for p, saved_p in zip(self.extra_parameters, checkpoint["extra_params"]):
-                p.data.copy_(saved_p.to(self.device))
+        checkpoint_extra_params = "extra_params" in checkpoint
+        trainer_extra_params = bool(self.extra_parameters)
+
+        if checkpoint_extra_params and not trainer_extra_params:
+            raise ValueError(
+                "Checkpoint contains extra parameters, but the current trainer "
+                "has none."
+            )
+        if trainer_extra_params and not checkpoint_extra_params:
+            raise ValueError(
+                "Current trainer has extra parameters, but the checkpoint "
+                "contains none."
+            )
+
+        if checkpoint_extra_params and trainer_extra_params:
+            saved_extra_params = checkpoint["extra_params"]
+            if len(saved_extra_params) != len(self.extra_parameters):
+                raise ValueError(
+                    "Checkpoint and current trainer have different numbers of "
+                    "extra parameters."
+                )
+            for index, (parameter, saved_parameter) in enumerate(
+                zip(self.extra_parameters, saved_extra_params)
+            ):
+                if parameter.shape != saved_parameter.shape:
+                    raise ValueError(
+                        f"Extra parameter {index} has shape {saved_parameter.shape} "
+                        f"in the checkpoint, expected {parameter.shape}."
+                    )
+                parameter.data.copy_(saved_parameter.to(self.device))
         return checkpoint
