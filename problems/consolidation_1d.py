@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 import numpy as np
+import torch
 from numpy.typing import ArrayLike, NDArray
 
 
@@ -271,14 +272,24 @@ def neumann_boundary_condition() -> BoundaryCondition:
 def pde_residual(
     dp_dt: ArrayLike,
     d2p_dx2: ArrayLike,
-) -> FloatArray:
+) -> Union[FloatArray, torch.Tensor]:
     """Compute the conceptual PDE residual ``r = p_t - p_xx``.
 
     ``dp_dt`` and ``d2p_dx2`` are derivatives supplied by a later model or
-    autodiff layer.  They must have exactly matching shapes because they
-    represent derivatives evaluated at the same collocation points. No
-    derivative calculation or finite differences occur in this function.
+    autodiff layer.  PyTorch tensors are subtracted directly so their
+    autograd graph is preserved. NumPy and array-like inputs retain the
+    existing float64 NumPy behavior. Inputs must use the same backend and
+    have exactly matching shapes because they represent derivatives
+    evaluated at the same collocation points. No derivative calculation or
+    finite differences occur in this function.
     """
+    if isinstance(dp_dt, torch.Tensor) != isinstance(d2p_dx2, torch.Tensor):
+        raise TypeError("dp_dt and d2p_dx2 must use the same backend")
+
+    if isinstance(dp_dt, torch.Tensor):
+        if dp_dt.shape != d2p_dx2.shape:
+            raise ValueError("dp_dt and d2p_dx2 must have the same shape")
+        return dp_dt - d2p_dx2
 
     dp_dt_array = _as_float_array(dp_dt)
     d2p_dx2_array = _as_float_array(d2p_dx2)

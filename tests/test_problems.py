@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import torch
 
 from problems.consolidation_1d import (
     Consolidation1DProblem,
@@ -80,6 +81,47 @@ def test_pde_residual_subtracts_spatial_second_derivative() -> None:
 def test_consolidation_pde_residual_rejects_mismatched_shapes() -> None:
     with pytest.raises(ValueError, match="dp_dt and d2p_dx2 must have the same shape"):
         pde_residual(np.zeros(3), np.zeros(2))
+
+
+def test_consolidation_pde_residual_supports_torch_tensors() -> None:
+    dp_dt = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+    d2p_dx2 = torch.tensor([[0.25, 0.5], [0.75, 1.0]])
+
+    residual = pde_residual(dp_dt, d2p_dx2)
+
+    assert isinstance(residual, torch.Tensor)
+    torch.testing.assert_close(residual, dp_dt - d2p_dx2)
+
+
+def test_consolidation_pde_residual_preserves_torch_autograd() -> None:
+    values = torch.tensor([[1.0, 2.0]], requires_grad=True)
+    dp_dt = 2.0 * values
+    d2p_dx2 = 0.5 * values
+
+    residual = pde_residual(dp_dt, d2p_dx2)
+    residual.sum().backward()
+
+    assert residual.requires_grad
+    torch.testing.assert_close(values.grad, torch.full_like(values, 1.5))
+
+
+def test_consolidation_pde_residual_rejects_mismatched_torch_shapes() -> None:
+    with pytest.raises(ValueError, match="dp_dt and d2p_dx2 must have the same shape"):
+        pde_residual(torch.zeros(3), torch.zeros(2))
+
+
+@pytest.mark.parametrize(
+    ("dp_dt", "d2p_dx2"),
+    [
+        (torch.zeros(2), np.zeros(2)),
+        (np.zeros(2), torch.zeros(2)),
+    ],
+)
+def test_consolidation_pde_residual_rejects_mixed_backends(
+    dp_dt: object, d2p_dx2: object
+) -> None:
+    with pytest.raises(TypeError, match="dp_dt and d2p_dx2 must use the same backend"):
+        pde_residual(dp_dt, d2p_dx2)  # type: ignore[arg-type]
 
 
 def test_reference_solution_broadcasts_and_is_finite() -> None:
