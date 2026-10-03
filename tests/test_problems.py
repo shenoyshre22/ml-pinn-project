@@ -99,7 +99,7 @@ def test_reproducible_sampling_with_same_seed() -> None:
     )
 
 
-def test_different_seeds_can_produce_different_samples() -> None:
+def test_different_seeds_produce_different_samples() -> None:
     first = Consolidation1DProblem(seed=6)
     second = Consolidation1DProblem(seed=7)
 
