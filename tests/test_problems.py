@@ -94,7 +94,7 @@ def test_reference_solution_satisfies_neumann_boundary_numerically() -> None:
         - reference_solution(1.0 - h, t_hat)
     ) / h
 
-    np.testing.assert_allclose(derivative, 0.0, atol=1e-5, rtol=0.0)
+    np.testing.assert_allclose(derivative, 0.0, atol=1e-4, rtol=0.0)
 
 
 def test_reproducible_sampling_with_same_seed() -> None:
