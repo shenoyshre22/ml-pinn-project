@@ -49,10 +49,6 @@ def _validate_count(count: int, name: str) -> int:
     return int(count)
 
 
-def _as_float_array(value: ArrayLike) -> FloatArray:
-    return np.asarray(value, dtype=np.float64)
-
-
 class Heat2DProblem:
     """Reusable definition of the nondimensional steady 2D heat problem.
 
@@ -156,9 +152,10 @@ class Heat2DProblem:
     def pde_residual(self, T_xx: ArrayLike, T_yy: ArrayLike) -> FloatArray:
         """Return the residual ``T_xx + T_yy + 1`` from supplied derivatives.
 
-        ``T_xx`` and ``T_yy`` must be broadcast-compatible.  Their derivatives
-        are supplied by the future PINN/autodiff engine; this method performs
-        no differentiation itself.
+        ``T_xx`` and ``T_yy`` must have exactly matching shapes because they
+        represent derivatives evaluated at the same collocation points. Their
+        derivatives are supplied by the future PINN/autodiff engine; this
+        method performs no differentiation itself.
         """
 
         return pde_residual(T_xx, T_yy)
@@ -178,9 +175,17 @@ def boundary_target(points: ArrayLike) -> FloatArray:
 
 
 def pde_residual(T_xx: ArrayLike, T_yy: ArrayLike) -> FloatArray:
-    """Return ``T_xx + T_yy + 1`` from already-computed derivatives."""
+    """Return ``T_xx + T_yy + 1`` from same-shaped computed derivatives.
 
-    return _as_float_array(T_xx) + _as_float_array(T_yy) + 1.0
+    Raises ``ValueError`` when the derivative arrays do not have exactly
+    matching shapes.
+    """
+
+    T_xx_array = np.asarray(T_xx, dtype=np.float64)
+    T_yy_array = np.asarray(T_yy, dtype=np.float64)
+    if T_xx_array.shape != T_yy_array.shape:
+        raise ValueError("T_xx and T_yy must have the same shape")
+    return T_xx_array + T_yy_array + 1.0
 
 
 __all__ = [
