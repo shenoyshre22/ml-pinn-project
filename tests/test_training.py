@@ -23,6 +23,41 @@ def test_trainer_moves_extra_parameters_to_model_device() -> None:
     assert extra_parameter.requires_grad
 
 
+def test_trainer_moves_extra_parameters_to_usable_cuda_device() -> None:
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is unavailable in this PyTorch installation")
+
+    try:
+        torch.zeros(1, device="cuda").add_(1)
+        torch.cuda.synchronize()
+    except Exception as error:
+        pytest.skip(f"CUDA is reported available but unusable: {error}")
+
+    model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    extra_parameter = torch.nn.Parameter(torch.tensor(1.0))
+    trainer = PINNTrainer(
+        model=model,
+        device="cuda",
+        extra_parameters=[extra_parameter],
+    )
+
+    model_device = next(trainer.model.parameters()).device
+    assert model_device.type == "cuda"
+    assert extra_parameter.device == model_device
+    assert any(parameter is extra_parameter for parameter in trainer.all_params)
+    assert extra_parameter.requires_grad
+
+    x_data = torch.zeros(2, 1, device=trainer.device)
+
+    def closure():
+        prediction = trainer.model(x_data) + extra_parameter
+        loss = torch.mean(prediction**2)
+        zero_boundary_loss = torch.zeros((), device=trainer.device)
+        return loss, zero_boundary_loss, None
+
+    trainer.train_adam(closure, epochs=1, lr=0.001, log_every=1)
+
+
 def test_trainer_adam_convergence():
     # Fit y = x^2 with small baseline PINN
     model = BaselinePINN(
