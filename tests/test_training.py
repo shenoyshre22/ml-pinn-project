@@ -214,3 +214,28 @@ def test_trainer_two_stage_adam_and_lbfgs():
 
     assert loss_after_lbfgs <= loss_after_adam
     assert trainer.history["epoch"][-1] > 20
+
+
+@pytest.mark.parametrize(
+    ("train_method", "log_every"),
+    [
+        ("train_adam", 0),
+        ("train_adam", -1),
+        ("train_lbfgs", 0),
+        ("train_lbfgs", -1),
+    ],
+)
+def test_trainer_rejects_non_positive_log_every(train_method, log_every):
+    model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    trainer = PINNTrainer(model=model)
+
+    def closure():
+        prediction = model(torch.zeros(1, 1, device=trainer.device))
+        zero_loss = torch.zeros((), device=trainer.device)
+        return prediction.mean(), zero_loss, None
+
+    with pytest.raises(ValueError, match="^log_every must be at least 1$"):
+        if train_method == "train_adam":
+            trainer.train_adam(closure, epochs=1, log_every=log_every)
+        else:
+            trainer.train_lbfgs(closure, max_iter=1, log_every=log_every)
