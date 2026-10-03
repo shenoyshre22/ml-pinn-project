@@ -50,6 +50,10 @@ class PINNTrainer:
         self.model = model.to(self.device)
         self.loss_fn = loss_fn if loss_fn is not None else PINNLoss()
         self.extra_parameters = extra_parameters or []
+        for parameter in self.extra_parameters:
+            parameter.data = parameter.data.to(self.device)
+            if parameter.grad is not None:
+                parameter.grad.data = parameter.grad.data.to(self.device)
 
         # All parameters to be optimized
         self.all_params = list(self.model.parameters()) + self.extra_parameters

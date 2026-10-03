@@ -8,6 +8,21 @@ from pinn.losses import PINNLoss
 from pinn.trainer import PINNTrainer
 
 
+def test_trainer_moves_extra_parameters_to_model_device() -> None:
+    model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    extra_parameter = torch.nn.Parameter(torch.tensor(1.0))
+    trainer = PINNTrainer(
+        model=model,
+        device="cpu",
+        extra_parameters=[extra_parameter],
+    )
+
+    model_device = next(trainer.model.parameters()).device
+    assert extra_parameter.device == model_device
+    assert any(parameter is extra_parameter for parameter in trainer.all_params)
+    assert extra_parameter.requires_grad
+
+
 def test_trainer_adam_convergence():
     # Fit y = x^2 with small baseline PINN
     model = BaselinePINN(
