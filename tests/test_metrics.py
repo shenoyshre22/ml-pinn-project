@@ -62,5 +62,7 @@ def test_metrics_support_multidimensional_arrays() -> None:
     [mean_squared_error, relative_l2_error, max_absolute_error],
 )
 def test_prediction_metrics_reject_incompatible_shapes(metric) -> None:
-    with pytest.raises(ValueError, match="incompatible shapes"):
+    with pytest.raises(
+        ValueError, match="y_true and y_pred must have the same shape"
+    ):
         metric(np.zeros((2, 2)), np.zeros(3))
