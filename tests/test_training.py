@@ -99,6 +99,91 @@ def test_trainer_checkpoint(tmp_path):
         assert torch.allclose(p1, p2)
 
 
+def test_trainer_checkpoint_restores_extra_parameters(tmp_path):
+    model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    saved_parameter = torch.nn.Parameter(torch.tensor(3.5))
+    trainer = PINNTrainer(model=model, extra_parameters=[saved_parameter])
+    checkpoint_path = str(tmp_path / "extra_params.pt")
+
+    trainer.save_checkpoint(checkpoint_path)
+
+    new_model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    restored_parameter = torch.nn.Parameter(torch.tensor(-2.0))
+    new_trainer = PINNTrainer(
+        model=new_model,
+        extra_parameters=[restored_parameter],
+    )
+    new_trainer.load_checkpoint(checkpoint_path)
+
+    assert restored_parameter.item() == pytest.approx(3.5)
+
+
+def test_trainer_checkpoint_rejects_unexpected_extra_parameters(tmp_path):
+    model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    saved_parameter = torch.nn.Parameter(torch.tensor(1.0))
+    checkpoint_path = str(tmp_path / "extra_params.pt")
+    PINNTrainer(model=model, extra_parameters=[saved_parameter]).save_checkpoint(
+        checkpoint_path
+    )
+
+    new_model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    new_trainer = PINNTrainer(model=new_model)
+    with pytest.raises(ValueError, match="checkpoint contains extra parameters"):
+        new_trainer.load_checkpoint(checkpoint_path)
+
+
+def test_trainer_checkpoint_rejects_missing_extra_parameters(tmp_path):
+    model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    checkpoint_path = str(tmp_path / "no_extra_params.pt")
+    PINNTrainer(model=model).save_checkpoint(checkpoint_path)
+
+    new_model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    extra_parameter = torch.nn.Parameter(torch.tensor(1.0))
+    new_trainer = PINNTrainer(
+        model=new_model,
+        extra_parameters=[extra_parameter],
+    )
+    with pytest.raises(ValueError, match="current trainer has extra parameters"):
+        new_trainer.load_checkpoint(checkpoint_path)
+
+
+def test_trainer_checkpoint_rejects_different_extra_parameter_counts(tmp_path):
+    model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    checkpoint_path = str(tmp_path / "one_extra_param.pt")
+    PINNTrainer(
+        model=model,
+        extra_parameters=[torch.nn.Parameter(torch.tensor(1.0))],
+    ).save_checkpoint(checkpoint_path)
+
+    new_model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    new_trainer = PINNTrainer(
+        model=new_model,
+        extra_parameters=[
+            torch.nn.Parameter(torch.tensor(2.0)),
+            torch.nn.Parameter(torch.tensor(3.0)),
+        ],
+    )
+    with pytest.raises(ValueError, match="different numbers of extra parameters"):
+        new_trainer.load_checkpoint(checkpoint_path)
+
+
+def test_trainer_checkpoint_rejects_extra_parameter_shape_mismatch(tmp_path):
+    model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    checkpoint_path = str(tmp_path / "shaped_extra_param.pt")
+    PINNTrainer(
+        model=model,
+        extra_parameters=[torch.nn.Parameter(torch.ones(2))],
+    ).save_checkpoint(checkpoint_path)
+
+    new_model = BaselinePINN(input_dim=1, output_dim=1, hidden_layers=1, hidden_units=8)
+    new_trainer = PINNTrainer(
+        model=new_model,
+        extra_parameters=[torch.nn.Parameter(torch.ones(3))],
+    )
+    with pytest.raises(ValueError, match=r"Extra parameter 0.*shape"):
+        new_trainer.load_checkpoint(checkpoint_path)
+
+
 def test_trainer_two_stage_adam_and_lbfgs():
     # Fit y = sin(pi * x)
     model = BaselinePINN(
