@@ -77,6 +77,11 @@ def test_pde_residual_subtracts_spatial_second_derivative() -> None:
     np.testing.assert_array_equal(residual, dp_dt - d2p_dx2)
 
 
+def test_consolidation_pde_residual_rejects_mismatched_shapes() -> None:
+    with pytest.raises(ValueError, match="dp_dt and d2p_dx2 must have the same shape"):
+        pde_residual(np.zeros(3), np.zeros(2))
+
+
 def test_reference_solution_broadcasts_and_is_finite() -> None:
     x_hat = np.array([[0.0], [0.5]])
     t_hat = np.array([[0.1, 0.5, 1.0]])
@@ -196,6 +201,19 @@ def test_heat_boundary_condition_metadata() -> None:
 
     assert condition.name == "dirichlet_boundary"
     assert condition.target == 0.0
+
+
+def test_heat_generic_sampling_aliases_are_available() -> None:
+    problem = Heat2DProblem(seed=12)
+
+    assert hasattr(problem, "sample_collocation")
+    assert hasattr(problem, "sample_test")
+    np.testing.assert_array_equal(
+        problem.sample_collocation(), problem.sample_interior()
+    )
+    np.testing.assert_array_equal(
+        problem.sample_test(), problem.sample_test_points()
+    )
 
 
 def test_heat_pde_residual_computation() -> None:

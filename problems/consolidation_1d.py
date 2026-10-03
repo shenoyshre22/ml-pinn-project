@@ -275,12 +275,16 @@ def pde_residual(
     """Compute the conceptual PDE residual ``r = p_t - p_xx``.
 
     ``dp_dt`` and ``d2p_dx2`` are derivatives supplied by a later model or
-    autodiff layer.  They must be NumPy-broadcastable; the output has their
-    broadcast shape.  No derivative calculation or finite differences occur
-    in this function.
+    autodiff layer.  They must have exactly matching shapes because they
+    represent derivatives evaluated at the same collocation points. No
+    derivative calculation or finite differences occur in this function.
     """
 
-    return _as_float_array(dp_dt) - _as_float_array(d2p_dx2)
+    dp_dt_array = _as_float_array(dp_dt)
+    d2p_dx2_array = _as_float_array(d2p_dx2)
+    if dp_dt_array.shape != d2p_dx2_array.shape:
+        raise ValueError("dp_dt and d2p_dx2 must have the same shape")
+    return dp_dt_array - d2p_dx2_array
 
 
 def reference_solution(

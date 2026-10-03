@@ -149,6 +149,9 @@ class Heat2DProblem:
         x, y = np.meshgrid(coordinates, coordinates, indexing="xy")
         return np.column_stack((x.ravel(), y.ravel()))
 
+    sample_collocation = sample_interior
+    sample_test = sample_test_points
+
     def pde_residual(self, T_xx: ArrayLike, T_yy: ArrayLike) -> FloatArray:
         """Return the residual ``T_xx + T_yy + 1`` from supplied derivatives.
 
