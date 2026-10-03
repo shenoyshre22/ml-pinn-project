@@ -88,6 +88,9 @@ class PINNTrainer:
         Returns:
             Dictionary containing loss histories.
         """
+        if not isinstance(log_every, int) or log_every < 1:
+            raise ValueError("log_every must be at least 1")
+
         optimizer = create_adam_optimizer(self.all_params, lr=lr)
         start_time = time.time()
 
@@ -141,6 +144,9 @@ class PINNTrainer:
         Returns:
             Updated history dictionary.
         """
+        if not isinstance(log_every, int) or log_every < 1:
+            raise ValueError("log_every must be at least 1")
+
         optimizer = create_lbfgs_optimizer(self.all_params, max_iter=max_iter)
         start_time = time.time()
         start_step = self.history["epoch"][-1] if self.history["epoch"] else 0
