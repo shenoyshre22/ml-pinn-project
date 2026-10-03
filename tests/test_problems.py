@@ -85,6 +85,18 @@ def test_reference_solution_broadcasts_and_is_finite() -> None:
     np.testing.assert_array_equal(values[0], np.zeros(3))
 
 
+def test_reference_solution_satisfies_neumann_boundary_numerically() -> None:
+    h = 1e-5
+    t_hat = np.array([0.1, 0.5, 1.0])
+
+    derivative = (
+        reference_solution(1.0, t_hat)
+        - reference_solution(1.0 - h, t_hat)
+    ) / h
+
+    np.testing.assert_allclose(derivative, 0.0, atol=1e-5, rtol=0.0)
+
+
 def test_reproducible_sampling_with_same_seed() -> None:
     first = Consolidation1DProblem(seed=5)
     second = Consolidation1DProblem(seed=5)
