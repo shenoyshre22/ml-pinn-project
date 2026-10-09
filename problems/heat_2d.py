@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 import numpy as np
+import torch
 from numpy.typing import ArrayLike, NDArray
 
 
@@ -177,12 +178,24 @@ def boundary_target(points: ArrayLike) -> FloatArray:
     return np.zeros(points_array.shape[0], dtype=np.float64)
 
 
-def pde_residual(T_xx: ArrayLike, T_yy: ArrayLike) -> FloatArray:
-    """Return ``T_xx + T_yy + 1`` from same-shaped computed derivatives.
+def pde_residual(
+    T_xx: ArrayLike, T_yy: ArrayLike
+) -> Union[FloatArray, torch.Tensor]:
+    """Compute ``T_xx + T_yy + 1`` from same-shaped computed derivatives.
 
-    Raises ``ValueError`` when the derivative arrays do not have exactly
-    matching shapes.
+    PyTorch tensors are added directly so their autograd graph is preserved.
+    NumPy and array-like inputs retain float64 NumPy behavior. Inputs must use
+    the same backend and have exactly matching shapes because they represent
+    derivatives evaluated at the same collocation points.
     """
+
+    if isinstance(T_xx, torch.Tensor) != isinstance(T_yy, torch.Tensor):
+        raise TypeError("T_xx and T_yy must use the same backend")
+
+    if isinstance(T_xx, torch.Tensor):
+        if T_xx.shape != T_yy.shape:
+            raise ValueError("T_xx and T_yy must have the same shape")
+        return T_xx + T_yy + 1.0
 
     T_xx_array = np.asarray(T_xx, dtype=np.float64)
     T_yy_array = np.asarray(T_yy, dtype=np.float64)

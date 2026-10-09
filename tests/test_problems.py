@@ -274,6 +274,47 @@ def test_heat_pde_residual_rejects_mismatched_shapes() -> None:
         heat_pde_residual(np.zeros(3), np.zeros(2))
 
 
+def test_heat_pde_residual_supports_torch_tensors() -> None:
+    T_xx = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+    T_yy = torch.tensor([[0.25, 0.5], [0.75, 1.0]])
+
+    residual = heat_pde_residual(T_xx, T_yy)
+
+    assert isinstance(residual, torch.Tensor)
+    torch.testing.assert_close(residual, T_xx + T_yy + 1.0)
+
+
+def test_heat_pde_residual_preserves_torch_autograd() -> None:
+    values = torch.tensor([[1.0, 2.0]], requires_grad=True)
+    T_xx = 2.0 * values
+    T_yy = 0.5 * values
+
+    residual = heat_pde_residual(T_xx, T_yy)
+    residual.sum().backward()
+
+    assert residual.requires_grad
+    torch.testing.assert_close(values.grad, torch.full_like(values, 2.5))
+
+
+def test_heat_pde_residual_rejects_mismatched_torch_shapes() -> None:
+    with pytest.raises(ValueError, match="T_xx and T_yy must have the same shape"):
+        heat_pde_residual(torch.zeros(3), torch.zeros(2))
+
+
+@pytest.mark.parametrize(
+    ("T_xx", "T_yy"),
+    [
+        (torch.zeros(2), np.zeros(2)),
+        (np.zeros(2), torch.zeros(2)),
+    ],
+)
+def test_heat_pde_residual_rejects_mixed_backends(
+    T_xx: object, T_yy: object
+) -> None:
+    with pytest.raises(TypeError, match="T_xx and T_yy must use the same backend"):
+        heat_pde_residual(T_xx, T_yy)  # type: ignore[arg-type]
+
+
 def test_heat_test_grid_size_and_domain() -> None:
     points = Heat2DProblem().sample_test_points()
 
