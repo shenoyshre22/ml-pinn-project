@@ -50,10 +50,11 @@ class ConsolidationExperimentConfig:
 
 @dataclass
 class ConsolidationExperimentResult:
-    """Trained model, optimization history, and reference-evaluation output."""
+    """Trained model, histories, and reference-evaluation output."""
 
     model: BaselinePINN
     history: Dict[str, List[float]]
+    condition_history: Dict[str, List[float]]
     metrics: Dict[str, float]
     predictions: np.ndarray = field(repr=False)
     reference_values: np.ndarray = field(repr=False)
@@ -122,6 +123,13 @@ def run_consolidation_experiment(
         ),
         device=device,
     )
+    condition_history: Dict[str, List[float]] = {
+        "epoch": [],
+        "dirichlet_loss": [],
+        "neumann_loss": [],
+        "initial_loss": [],
+    }
+    latest_condition_losses: Dict[str, float] = {}
 
     def closure() -> tuple[torch.Tensor, torch.Tensor, None]:
         interior_prediction = model(interior_tensor)
@@ -149,14 +157,27 @@ def run_consolidation_experiment(
             initial_prediction, torch.ones_like(initial_prediction)
         )
         loss_b = (loss_dirichlet + loss_neumann + loss_initial) / 3.0
+        latest_condition_losses.update(
+            {
+                "dirichlet_loss": float(loss_dirichlet.detach().item()),
+                "neumann_loss": float(loss_neumann.detach().item()),
+                "initial_loss": float(loss_initial.detach().item()),
+            }
+        )
 
         return loss_f, loss_b, None
+
+    def record_condition_losses(epoch: int, _: Dict[str, float]) -> None:
+        condition_history["epoch"].append(epoch)
+        for name in ("dirichlet_loss", "neumann_loss", "initial_loss"):
+            condition_history[name].append(latest_condition_losses[name])
 
     history = trainer.train_adam(
         closure,
         epochs=config.epochs,
         lr=config.learning_rate,
         log_every=config.log_every,
+        callbacks=[record_condition_losses],
     )
 
     model.eval()
@@ -178,6 +199,7 @@ def run_consolidation_experiment(
     return ConsolidationExperimentResult(
         model=model,
         history=history,
+        condition_history=condition_history,
         metrics=metrics,
         predictions=predictions,
         reference_values=reference_values,
