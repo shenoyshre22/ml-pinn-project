@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import argparse
+import copy
 import json
+import random
 import time
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import torch
@@ -56,6 +58,9 @@ class ConsolidationExperimentConfig:
     lbfgs_max_iter: int = 50000
     lbfgs_log_every: int = 100
     output_path: str | None = None
+    checkpoint_dir: str | None = None
+    checkpoint_every: int = 100
+    resume_from: str | None = None
 
 
 @dataclass
@@ -83,6 +88,8 @@ def run_consolidation_experiment(
     """
 
     config = config or ConsolidationExperimentConfig()
+    if config.checkpoint_every < 1:
+        raise ValueError("checkpoint_every must be at least 1")
     torch.manual_seed(config.seed)
 
     problem = Consolidation1DProblem(
@@ -148,6 +155,44 @@ def run_consolidation_experiment(
         "initial_loss": [],
     }
     latest_condition_losses: Dict[str, float] = {}
+    resume_state: Dict[str, Any] | None = None
+    if config.resume_from is not None:
+        resume_state = _load_consolidation_checkpoint(
+            config.resume_from, model, trainer, condition_history, config
+        )
+        _restore_rng_state(resume_state.get("rng_state"))
+
+    def save_checkpoint(
+        stage: str,
+        completed_epoch: int,
+        optimizer: torch.optim.Optimizer | None,
+        lbfgs_iterations: int = 0,
+    ) -> None:
+        if config.checkpoint_dir is None:
+            return
+        state = {
+            "checkpoint_version": 1,
+            "experiment": "consolidation",
+            "stage": stage,
+            "completed_epoch": completed_epoch,
+            "lbfgs_iterations": lbfgs_iterations,
+            "model_state_dict": copy.deepcopy(model.state_dict()),
+            "optimizer_state_dict": (
+                copy.deepcopy(optimizer.state_dict()) if optimizer is not None else None
+            ),
+            "history": copy.deepcopy(trainer.history),
+            "condition_history": copy.deepcopy(condition_history),
+            "configuration": vars(config).copy(),
+            "rng_state": _capture_rng_state(),
+        }
+        checkpoint_dir = Path(config.checkpoint_dir)
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        filename = (
+            f"consolidation_{stage}_epoch_{completed_epoch:08d}"
+            f"_lbfgs_{lbfgs_iterations:08d}.pt"
+        )
+        _atomic_torch_save(state, checkpoint_dir / filename)
+        _atomic_torch_save(state, checkpoint_dir / "consolidation_latest.pt")
 
     def closure() -> tuple[torch.Tensor, torch.Tensor, None]:
         interior_prediction = model(interior_tensor)
@@ -190,28 +235,82 @@ def run_consolidation_experiment(
         for name in ("dirichlet_loss", "neumann_loss", "initial_loss"):
             condition_history[name].append(latest_condition_losses[name])
 
-    history = trainer.train_adam(
-        closure,
-        epochs=config.epochs,
-        lr=config.learning_rate,
-        log_every=config.log_every,
-        callbacks=[record_condition_losses],
+    loaded_stage = resume_state.get("stage") if resume_state else None
+    completed_adam = (
+        int(resume_state.get("completed_epoch", 0))
+        if loaded_stage == "adam"
+        else config.epochs if loaded_stage in ("lbfgs", "complete") else 0
+    )
+    if completed_adam < config.epochs:
+        history = trainer.train_adam(
+            closure,
+            epochs=config.epochs,
+            lr=config.learning_rate,
+            log_every=config.log_every,
+            callbacks=[record_condition_losses],
+            start_epoch=completed_adam,
+            optimizer_state=(
+                resume_state.get("optimizer_state_dict")
+                if loaded_stage == "adam"
+                else None
+            ),
+            step_callback=lambda epoch, _, optimizer: (
+                save_checkpoint("adam", epoch, optimizer)
+                if epoch % config.checkpoint_every == 0 or epoch == config.epochs
+                else None
+            ),
+        )
+    else:
+        history = trainer.history
+    adam_history_length = sum(
+        epoch <= config.epochs for epoch in history["epoch"]
     )
     stage_histories = {
-        "adam": {key: list(values) for key, values in history.items()}
+        "adam": {
+            key: list(values[:adam_history_length])
+            for key, values in history.items()
+        }
     }
     if config.lbfgs_enabled:
-        adam_history_length = len(history["epoch"])
-        history = trainer.train_lbfgs(
-            closure,
-            max_iter=config.lbfgs_max_iter,
-            log_every=config.lbfgs_log_every,
-            callbacks=[record_condition_losses],
+        lbfgs_iterations = (
+            int(resume_state.get("lbfgs_iterations", 0))
+            if loaded_stage == "lbfgs"
+            else 0
         )
+        lbfgs_optimizer_state = (
+            resume_state.get("optimizer_state_dict")
+            if loaded_stage == "lbfgs"
+            else None
+        )
+        if loaded_stage != "lbfgs":
+            save_checkpoint("lbfgs", config.epochs, None, lbfgs_iterations)
+        while lbfgs_iterations < config.lbfgs_max_iter:
+            chunk = min(config.checkpoint_every, config.lbfgs_max_iter - lbfgs_iterations)
+            observed_step = [config.epochs + lbfgs_iterations]
+            history = trainer.train_lbfgs(
+                closure,
+                max_iter=chunk,
+                log_every=config.lbfgs_log_every,
+                callbacks=[record_condition_losses],
+                optimizer_state=lbfgs_optimizer_state,
+                step_callback=lambda step, _, optimizer: (
+                    observed_step.__setitem__(0, step),
+                    save_checkpoint("lbfgs", config.epochs, optimizer, step - config.epochs),
+                ),
+            )
+            lbfgs_iterations = max(lbfgs_iterations + chunk, observed_step[0] - config.epochs)
+            lbfgs_optimizer_state = None
         stage_histories["lbfgs"] = {
             key: list(values[adam_history_length:])
             for key, values in history.items()
         }
+    if config.checkpoint_dir is not None:
+        save_checkpoint(
+            "complete",
+            history["epoch"][-1] if history["epoch"] else 0,
+            None,
+            config.lbfgs_max_iter if config.lbfgs_enabled else 0,
+        )
 
     model.eval()
     with torch.no_grad():
@@ -260,7 +359,67 @@ def load_consolidation_config(path: str | Path) -> ConsolidationExperimentConfig
         raise ValueError("all consolidation point counts must be positive")
     if min(config.pde_weight, config.condition_weight) < 0:
         raise ValueError("consolidation loss weights must be non-negative")
+    if config.checkpoint_every < 1:
+        raise ValueError("checkpoint_every must be at least 1")
     return config
+
+
+def _capture_rng_state() -> Dict[str, Any]:
+    state: Dict[str, Any] = {
+        "python": random.getstate(),
+        "numpy": np.random.get_state(),
+        "torch": torch.get_rng_state(),
+    }
+    if torch.cuda.is_available():
+        state["torch_cuda"] = torch.cuda.get_rng_state_all()
+    return state
+
+
+def _restore_rng_state(state: Dict[str, Any] | None) -> None:
+    if not state:
+        return
+    random.setstate(state["python"])
+    np.random.set_state(state["numpy"])
+    torch.set_rng_state(state["torch"])
+    if "torch_cuda" in state and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(state["torch_cuda"])
+
+
+def _atomic_torch_save(state: Dict[str, Any], target: Path) -> None:
+    temporary = target.with_suffix(target.suffix + ".tmp")
+    torch.save(state, temporary)
+    temporary.replace(target)
+
+
+def _load_consolidation_checkpoint(
+    path: str,
+    model: BaselinePINN,
+    trainer: PINNTrainer,
+    condition_history: Dict[str, List[float]],
+    config: ConsolidationExperimentConfig,
+) -> Dict[str, Any]:
+    checkpoint = torch.load(
+        path, map_location=trainer.device, weights_only=False
+    )
+    if checkpoint.get("experiment") != "consolidation":
+        raise ValueError("checkpoint is not for the consolidation experiment")
+    saved_config = checkpoint.get("configuration", {})
+    ignored = {"checkpoint_dir", "resume_from", "output_path"}
+    current_config = vars(config)
+    mismatches = [
+        key
+        for key in current_config
+        if key not in ignored and saved_config.get(key) != current_config[key]
+    ]
+    if mismatches:
+        raise ValueError(
+            "checkpoint configuration does not match the current run: "
+            + ", ".join(sorted(mismatches))
+        )
+    model.load_state_dict(checkpoint["model_state_dict"])
+    trainer.history = checkpoint.get("history", trainer.history)
+    condition_history.update(checkpoint.get("condition_history", {}))
+    return checkpoint
 
 
 def save_consolidation_result(
@@ -296,6 +455,7 @@ def save_consolidation_result(
             and all(np.isfinite(values).all() for values in result.history.values())
         ),
         "output_npz": str(target.with_suffix(".npz")),
+        "checkpoint_directory": config.checkpoint_dir,
     }
     np.savez_compressed(
         target.with_suffix(".npz"),
@@ -315,8 +475,20 @@ def save_consolidation_result(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
+    parser.add_argument("--checkpoint-dir")
+    parser.add_argument("--checkpoint-every", type=int)
+    parser.add_argument("--resume-from")
     args = parser.parse_args()
     loaded_config = load_consolidation_config(args.config)
+    overrides = {}
+    if args.checkpoint_dir is not None:
+        overrides["checkpoint_dir"] = args.checkpoint_dir
+    if args.checkpoint_every is not None:
+        overrides["checkpoint_every"] = args.checkpoint_every
+    if args.resume_from is not None:
+        overrides["resume_from"] = args.resume_from
+    if overrides:
+        loaded_config = replace(loaded_config, **overrides)
     started = time.perf_counter()
     loaded_result = run_consolidation_experiment(loaded_config)
     save_consolidation_result(

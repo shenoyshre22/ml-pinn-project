@@ -21,3 +21,6 @@ lbfgs_enabled: true
 lbfgs_max_iter: 50000
 lbfgs_log_every: 1000
 output_path: results/consolidation_paper_50000ep_lr_0001.json
+checkpoint_dir: checkpoints/consolidation_paper
+checkpoint_every: 100
+resume_from: null

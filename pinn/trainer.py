@@ -75,6 +75,11 @@ class PINNTrainer:
         lr: float = 0.001,
         log_every: int = 1000,
         callbacks: Optional[List[Callable[[int, Dict[str, float]], None]]] = None,
+        start_epoch: int = 0,
+        optimizer_state: Optional[Dict[str, Any]] = None,
+        step_callback: Optional[
+            Callable[[int, Dict[str, float], torch.optim.Optimizer], None]
+        ] = None,
     ) -> Dict[str, List[float]]:
         """Executes Adam optimization phase.
 
@@ -91,10 +96,14 @@ class PINNTrainer:
         if not isinstance(log_every, int) or log_every < 1:
             raise ValueError("log_every must be at least 1")
 
+        if start_epoch < 0 or start_epoch > epochs:
+            raise ValueError("start_epoch must be between 0 and epochs")
         optimizer = create_adam_optimizer(self.all_params, lr=lr)
+        if optimizer_state is not None:
+            optimizer.load_state_dict(optimizer_state)
         start_time = time.time()
 
-        for epoch in range(1, epochs + 1):
+        for epoch in range(start_epoch + 1, epochs + 1):
             optimizer.zero_grad()
             loss_f, loss_b, loss_d = closure_fn()
             total_loss, loss_dict = self.loss_fn(loss_f, loss_b, loss_d)
@@ -124,6 +133,9 @@ class PINNTrainer:
                     f"Time: {elapsed:.2f}s"
                 )
 
+            if step_callback is not None:
+                step_callback(epoch, loss_dict, optimizer)
+
         return self.history
 
     def train_lbfgs(
@@ -132,6 +144,10 @@ class PINNTrainer:
         max_iter: int = 50000,
         log_every: int = 100,
         callbacks: Optional[List[Callable[[int, Dict[str, float]], None]]] = None,
+        optimizer_state: Optional[Dict[str, Any]] = None,
+        step_callback: Optional[
+            Callable[[int, Dict[str, float], torch.optim.Optimizer], None]
+        ] = None,
     ) -> Dict[str, List[float]]:
         """Executes L-BFGS optimization phase.
 
@@ -148,6 +164,8 @@ class PINNTrainer:
             raise ValueError("log_every must be at least 1")
 
         optimizer = create_lbfgs_optimizer(self.all_params, max_iter=max_iter)
+        if optimizer_state is not None:
+            optimizer.load_state_dict(optimizer_state)
         start_time = time.time()
         start_step = self.history["epoch"][-1] if self.history["epoch"] else 0
         step_counter = [0]
@@ -187,6 +205,12 @@ class PINNTrainer:
             return total_loss
 
         optimizer.step(step_closure)
+        if step_callback is not None:
+            step_callback(
+                start_step + step_counter[0],
+                {},
+                optimizer,
+            )
         return self.history
 
     def save_checkpoint(self, filepath: str, extra_state: Optional[Dict[str, Any]] = None) -> None:

@@ -67,6 +67,36 @@ with:
 .venv\Scripts\python.exe -m experiments.run_inverse --config configs/inverse_paper.yaml
 ```
 
+The consolidation runner supports resumable checkpoints for its Adam and
+L-BFGS stages. The paper configuration writes checkpoints under
+`checkpoints/consolidation_paper`. Checkpoints contain model weights,
+optimizer state, completed stage progress, histories, and Python/NumPy/PyTorch
+random-number-generator state. Checkpoint writes use a temporary file followed
+by an atomic replacement. To override the directory or frequency:
+
+```powershell
+.venv\Scripts\python.exe -m experiments.run_consolidation `
+  --config configs/consolidation_paper.yaml `
+  --checkpoint-dir checkpoints/consolidation_retry `
+  --checkpoint-every 100
+```
+
+Resume from a periodic checkpoint with:
+
+```powershell
+.venv\Scripts\python.exe -m experiments.run_consolidation `
+  --config configs/consolidation_paper.yaml `
+  --resume-from checkpoints/consolidation_paper/consolidation_latest.pt
+```
+
+For a checkpoint taken during Adam, the runner continues at the next epoch
+without repeating completed epochs. For L-BFGS, checkpoints are taken only at
+safe outer `optimizer.step` boundaries and restore PyTorch's L-BFGS history;
+the closure is recreated from the current experiment data. The final
+`complete` checkpoint intentionally omits an optimizer state because no
+further training remains. Do not resume from it unless the goal is only to
+re-evaluate the saved model.
+
 Default paper outputs are:
 
 - `results/consolidation_paper_50000ep_lr_0001.json` and `.npz`
