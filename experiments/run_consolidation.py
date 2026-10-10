@@ -404,7 +404,7 @@ def _load_consolidation_checkpoint(
     if checkpoint.get("experiment") != "consolidation":
         raise ValueError("checkpoint is not for the consolidation experiment")
     saved_config = checkpoint.get("configuration", {})
-    ignored = {"checkpoint_dir", "resume_from", "output_path"}
+    ignored = {"checkpoint_dir", "resume_from", "output_path", "epochs"}
     current_config = vars(config)
     mismatches = [
         key
