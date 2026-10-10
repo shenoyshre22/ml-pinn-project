@@ -46,3 +46,49 @@ coordinate to sine and cosine features before the same downstream MLP. See
 `configs/heat_fourier.yaml` for the reproducible 20,000-epoch comparison
 configuration. The full training run is intentionally separate from the
 baseline results.
+
+## Paper-specific reproduction configurations
+
+The paper-specific YAML files preserve the existing smoke-test, baseline, and
+Fourier configurations. Each runner now requires an explicit configuration
+path when invoked as a module and records JSON/NPZ output at the configured
+`output_path`. Install dependencies with:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Run the three paper configurations on CPU (including CPU-only Google Colab)
+with:
+
+```powershell
+.venv\Scripts\python.exe -m experiments.run_consolidation --config configs/consolidation_paper.yaml
+.venv\Scripts\python.exe -m experiments.run_heat --config configs/heat_paper.yaml
+.venv\Scripts\python.exe -m experiments.run_inverse --config configs/inverse_paper.yaml
+```
+
+Default paper outputs are:
+
+- `results/consolidation_paper_50000ep_lr_0001.json` and `.npz`
+- `results/heat_paper_50000ep_lr_00005.json` and `.npz`
+- `results/inverse_paper_100000ep_lr_0005.json` and `.npz`
+
+The first two configurations run Adam followed by the existing trainer's
+L-BFGS stage. The inverse paper configuration intentionally runs Adam only:
+the available paper description specifies the 100,000-epoch Adam procedure but
+does not specify an inverse L-BFGS stage.
+
+These are configuration reproductions, not claims of numerical reproduction.
+The consolidation paper does not specify a finite time horizon in the
+available description; this project uses `time_max: 0.5` because it is the
+paper's normalized maximum time supplied for this audit. The inverse
+observation horizon is not specified; `time_max: 10.0` is an explicit project
+assumption. Its 50 initial-condition points are repeated at `t=0` so both
+displacement and velocity constraints can be imposed.
+
+The heat reference currently available at
+`results/heat_fem_reference.npz` is an independently generated structured
+piecewise-linear triangular FEM approximation. It matches the heat PDE,
+domain, and boundary conditions, but it is not the paper's deal.II tutorial 3
+output. The paper-reported inverse parameter values are stored for comparison
+only; they are not asserted until a full run is evaluated.

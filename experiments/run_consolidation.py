@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import argparse
+import json
+import time
+from pathlib import Path
 from typing import Dict, List, Union
 
 import numpy as np
@@ -18,6 +22,7 @@ from pinn.derivatives import nth_derivative
 from pinn.losses import PINNLoss, mse_loss, residual_loss
 from pinn.trainer import PINNTrainer
 from problems.consolidation_1d import Consolidation1DProblem
+from experiments.config_utils import load_dataclass_config
 
 
 @dataclass(frozen=True)
@@ -46,6 +51,11 @@ class ConsolidationExperimentConfig:
     pde_weight: float = 1.0
     condition_weight: float = 1.0
     reference_terms: int = 100
+    output_transform_x: bool = False
+    lbfgs_enabled: bool = False
+    lbfgs_max_iter: int = 50000
+    lbfgs_log_every: int = 100
+    output_path: str | None = None
 
 
 @dataclass
@@ -58,6 +68,8 @@ class ConsolidationExperimentResult:
     metrics: Dict[str, float]
     predictions: np.ndarray = field(repr=False)
     reference_values: np.ndarray = field(repr=False)
+    test_coordinates: np.ndarray = field(repr=False)
+    stage_histories: Dict[str, Dict[str, List[float]]] = field(default_factory=dict)
 
 
 def run_consolidation_experiment(
@@ -106,6 +118,11 @@ def run_consolidation_experiment(
     initial_tensor = torch.tensor(initial, dtype=torch.float32, device=device)
     test_tensor = torch.tensor(test, dtype=torch.float32, device=device)
 
+    output_transform = (
+        (lambda coordinates, values: coordinates[:, 0:1] * values)
+        if config.output_transform_x
+        else None
+    )
     model = BaselinePINN(
         input_dim=2,
         output_dim=1,
@@ -113,6 +130,7 @@ def run_consolidation_experiment(
         hidden_units=config.hidden_units,
         activation=config.activation,
         initializer=config.initializer,
+        output_transform=output_transform,
     )
     trainer = PINNTrainer(
         model=model,
@@ -179,6 +197,21 @@ def run_consolidation_experiment(
         log_every=config.log_every,
         callbacks=[record_condition_losses],
     )
+    stage_histories = {
+        "adam": {key: list(values) for key, values in history.items()}
+    }
+    if config.lbfgs_enabled:
+        adam_history_length = len(history["epoch"])
+        history = trainer.train_lbfgs(
+            closure,
+            max_iter=config.lbfgs_max_iter,
+            log_every=config.lbfgs_log_every,
+            callbacks=[record_condition_losses],
+        )
+        stage_histories["lbfgs"] = {
+            key: list(values[adam_history_length:])
+            for key, values in history.items()
+        }
 
     model.eval()
     with torch.no_grad():
@@ -203,8 +236,89 @@ def run_consolidation_experiment(
         metrics=metrics,
         predictions=predictions,
         reference_values=reference_values,
+        test_coordinates=test,
+        stage_histories=stage_histories,
     )
 
 
+def load_consolidation_config(path: str | Path) -> ConsolidationExperimentConfig:
+    config = load_dataclass_config(
+        path,
+        ConsolidationExperimentConfig,
+        required={
+            "time_max", "n_interior", "n_spatial_boundary", "n_initial",
+            "n_test", "seed", "device", "hidden_layers", "hidden_units",
+            "activation", "initializer", "epochs", "learning_rate", "log_every",
+            "pde_weight", "condition_weight", "reference_terms",
+            "output_transform_x", "lbfgs_enabled", "lbfgs_max_iter",
+            "lbfgs_log_every", "output_path",
+        },
+    )
+    if config.time_max <= 0 or config.epochs < 1 or config.learning_rate <= 0:
+        raise ValueError("time_max must be positive, epochs at least 1, and learning_rate positive")
+    if min(config.n_interior, config.n_spatial_boundary, config.n_initial, config.n_test) < 1:
+        raise ValueError("all consolidation point counts must be positive")
+    if min(config.pde_weight, config.condition_weight) < 0:
+        raise ValueError("consolidation loss weights must be non-negative")
+    return config
+
+
+def save_consolidation_result(
+    result: ConsolidationExperimentResult,
+    config: ConsolidationExperimentConfig,
+    runtime_seconds: float,
+) -> None:
+    if config.output_path is None:
+        raise ValueError("output_path is required when saving consolidation results")
+    target = Path(config.output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() or target.with_suffix(".npz").exists():
+        raise FileExistsError(f"refusing to overwrite existing output: {target}")
+    configuration = vars(config).copy()
+    configuration["device"] = str(config.device)
+    payload = {
+        "experiment": "consolidation",
+        "configuration": configuration,
+        "runtime_seconds": runtime_seconds,
+        "actual_epochs_completed": result.history["epoch"][-1],
+        "training_stages": {
+            "adam_epochs": config.epochs,
+            "lbfgs_enabled": config.lbfgs_enabled,
+            "lbfgs_max_iter": config.lbfgs_max_iter if config.lbfgs_enabled else 0,
+        },
+        "metrics": result.metrics,
+        "final_losses": {
+            key: result.history[key][-1]
+            for key in ("total_loss", "pde_loss", "bc_loss", "data_loss")
+        },
+        "finite_values": bool(
+            np.isfinite(result.predictions).all()
+            and all(np.isfinite(values).all() for values in result.history.values())
+        ),
+        "output_npz": str(target.with_suffix(".npz")),
+    }
+    np.savez_compressed(
+        target.with_suffix(".npz"),
+        predictions=result.predictions,
+        reference_values=result.reference_values,
+        test_coordinates=result.test_coordinates,
+        **{key: np.asarray(values) for key, values in result.history.items()},
+        **{
+            f"{stage}_{key}": np.asarray(values)
+            for stage, stage_history in result.stage_histories.items()
+            for key, values in stage_history.items()
+        },
+    )
+    target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 if __name__ == "__main__":
-    run_consolidation_experiment()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True)
+    args = parser.parse_args()
+    loaded_config = load_consolidation_config(args.config)
+    started = time.perf_counter()
+    loaded_result = run_consolidation_experiment(loaded_config)
+    save_consolidation_result(
+        loaded_result, loaded_config, time.perf_counter() - started
+    )

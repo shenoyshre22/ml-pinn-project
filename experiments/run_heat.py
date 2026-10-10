@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import argparse
+import json
+import time
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -21,6 +25,7 @@ from evaluation.metrics import (
     relative_l2_error,
 )
 from evaluation.reference_solutions import load_heat_fem_reference
+from experiments.config_utils import load_dataclass_config
 
 
 @dataclass(frozen=True)
@@ -46,6 +51,10 @@ class HeatExperimentConfig:
     num_fourier_features: int = 64
     fourier_scale: float = 1.0
     trainable_fourier: bool = False
+    lbfgs_enabled: bool = False
+    lbfgs_max_iter: int = 50000
+    lbfgs_log_every: int = 100
+    output_path: str | None = None
 
 
 @dataclass
@@ -58,6 +67,7 @@ class HeatExperimentResult:
     predictions: np.ndarray = field(repr=False)
     diagnostics: Dict[str, float]
     reference_metrics: Optional[Dict[str, float]] = None
+    stage_histories: Dict[str, Dict[str, List[float]]] = field(default_factory=dict)
 
 
 def _test_residual_statistics(
@@ -170,6 +180,20 @@ def run_heat_experiment(
         lr=config.learning_rate,
         log_every=config.log_every,
     )
+    stage_histories = {
+        "adam": {key: list(values) for key, values in history.items()}
+    }
+    if config.lbfgs_enabled:
+        adam_history_length = len(history["epoch"])
+        history = trainer.train_lbfgs(
+            closure,
+            max_iter=config.lbfgs_max_iter,
+            log_every=config.lbfgs_log_every,
+        )
+        stage_histories["lbfgs"] = {
+            key: list(values[adam_history_length:])
+            for key, values in history.items()
+        }
 
     model.eval()
     with torch.no_grad():
@@ -200,8 +224,99 @@ def run_heat_experiment(
         predictions=predictions,
         diagnostics=diagnostics,
         reference_metrics=reference_metrics,
+        stage_histories=stage_histories,
     )
 
 
+def load_heat_config(path: str | Path) -> HeatExperimentConfig:
+    config = load_dataclass_config(
+        path,
+        HeatExperimentConfig,
+        required={
+            "n_interior", "n_boundary", "n_test", "seed", "device",
+            "hidden_layers", "hidden_units", "activation", "initializer",
+            "epochs", "learning_rate", "log_every", "pde_weight",
+            "boundary_weight", "reference_path", "model",
+            "num_fourier_features", "fourier_scale", "trainable_fourier",
+            "lbfgs_enabled", "lbfgs_max_iter", "lbfgs_log_every", "output_path",
+        },
+    )
+    if config.epochs < 1 or config.learning_rate <= 0:
+        raise ValueError("epochs must be at least 1 and learning_rate must be positive")
+    if min(config.n_interior, config.n_boundary, config.n_test) < 1:
+        raise ValueError("all heat point counts must be positive")
+    if min(config.pde_weight, config.boundary_weight) < 0:
+        raise ValueError("heat loss weights must be non-negative")
+    if config.model.lower().strip() not in {"baseline", "fourier"}:
+        raise ValueError("heat model must be 'baseline' or 'fourier'")
+    return config
+
+
+def save_heat_result(
+    result: HeatExperimentResult,
+    config: HeatExperimentConfig,
+    runtime_seconds: float,
+) -> None:
+    if config.output_path is None:
+        raise ValueError("output_path is required when saving heat results")
+    target = Path(config.output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() or target.with_suffix(".npz").exists():
+        raise FileExistsError(f"refusing to overwrite existing output: {target}")
+    configuration = vars(config).copy()
+    configuration["device"] = str(config.device)
+    reference_arrays: dict[str, np.ndarray] = {}
+    if config.reference_path is not None:
+        reference_coordinates, reference_values, _ = load_heat_fem_reference(
+            config.reference_path,
+            problem=None,
+        )
+        reference_arrays = {
+            "reference_coordinates": reference_coordinates,
+            "reference_values": reference_values,
+        }
+    payload = {
+        "experiment": config.model,
+        "configuration": configuration,
+        "runtime_seconds": runtime_seconds,
+        "actual_epochs_completed": result.history["epoch"][-1],
+        "training_stages": {
+            "adam_epochs": config.epochs,
+            "lbfgs_enabled": config.lbfgs_enabled,
+            "lbfgs_max_iter": config.lbfgs_max_iter if config.lbfgs_enabled else 0,
+        },
+        "diagnostics": result.diagnostics,
+        "reference_metrics": result.reference_metrics,
+        "final_losses": {
+            key: result.history[key][-1]
+            for key in ("total_loss", "pde_loss", "bc_loss", "data_loss")
+        },
+        "finite_values": bool(
+            np.isfinite(result.predictions).all()
+            and all(np.isfinite(values).all() for values in result.history.values())
+        ),
+        "output_npz": str(target.with_suffix(".npz")),
+    }
+    np.savez_compressed(
+        target.with_suffix(".npz"),
+        test_coordinates=result.test_coordinates,
+        predictions=result.predictions,
+        **reference_arrays,
+        **{key: np.asarray(values) for key, values in result.history.items()},
+        **{
+            f"{stage}_{key}": np.asarray(values)
+            for stage, stage_history in result.stage_histories.items()
+            for key, values in stage_history.items()
+        },
+    )
+    target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 if __name__ == "__main__":
-    run_heat_experiment()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True)
+    args = parser.parse_args()
+    loaded_config = load_heat_config(args.config)
+    started = time.perf_counter()
+    loaded_result = run_heat_experiment(loaded_config)
+    save_heat_result(loaded_result, loaded_config, time.perf_counter() - started)
