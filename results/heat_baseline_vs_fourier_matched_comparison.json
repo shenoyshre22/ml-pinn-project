@@ -1,0 +1,42 @@
+{
+  "experiment": "heat_baseline_vs_fourier_matched",
+  "metric_formula": "relative_l2_error = ||prediction - reference||_2 / ||reference||_2; MSE = mean((prediction-reference)^2)",
+  "evaluation_match": {
+    "test_coordinates_match": true,
+    "reference_coordinates_match": true,
+    "reference_values_match": true,
+    "reference_path": "results\\heat_fem_reference.npz",
+    "metrics_module": "evaluation/metrics.py"
+  },
+  "runs": [
+    {
+      "model": "conventional_baseline_pinn",
+      "run": "matched_baseline",
+      "epochs": 10000,
+      "learning_rate": 0.001,
+      "relative_l2_error": 0.011655501775912652,
+      "mean_squared_error": 3.6224340655327702e-06,
+      "max_absolute_error": 0.01742997020483017,
+      "final_pde_loss": 1.0252168067381717e-05,
+      "final_boundary_loss": 2.3223989046528004e-05,
+      "final_total_loss": 3.347615711390972e-05,
+      "runtime_seconds": 248.0318553000002
+    },
+    {
+      "model": "fourier_feature_pinn",
+      "run": "fourier_run_c",
+      "epochs": 10000,
+      "learning_rate": 0.001,
+      "relative_l2_error": 0.8992548281515444,
+      "mean_squared_error": 0.021562747436372647,
+      "max_absolute_error": 0.31668625051107946,
+      "final_pde_loss": 0.0020585041493177414,
+      "final_boundary_loss": 0.00040798282134346664,
+      "final_total_loss": 0.0024664869997650385,
+      "runtime_seconds": 527.0115083999999
+    }
+  ],
+  "relative_l2_error_change_percent_baseline_vs_fourier": -98.70387109292803,
+  "mse_change_percent_baseline_vs_fourier": -99.98320049856252,
+  "interpretation": "Positive change percentages mean the baseline metric is higher (deterioration) than Fourier Run C; negative values mean improvement."
+}

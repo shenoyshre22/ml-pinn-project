@@ -1,0 +1,51 @@
+{
+  "model": "conventional_baseline_pinn",
+  "configuration": {
+    "n_interior": 1500,
+    "n_boundary": 500,
+    "n_test": 10000,
+    "seed": 2026,
+    "device": "cpu",
+    "hidden_layers": 3,
+    "hidden_units": 32,
+    "activation": "tanh",
+    "initializer": "glorot_normal",
+    "epochs": 10000,
+    "learning_rate": 0.001,
+    "log_every": 100,
+    "pde_weight": 1.0,
+    "boundary_weight": 1.0,
+    "reference_path": "D:\\Shreya\\PESU\\YEAR3\\SEM5\\ML\\mini_proj\\codebase\\ml-pinn-project\\results\\heat_fem_reference.npz",
+    "model": "baseline",
+    "num_fourier_features": 64,
+    "fourier_scale": 1.0,
+    "trainable_fourier": false
+  },
+  "actual_epochs_completed": 10000,
+  "actual_learning_rate": 0.001,
+  "runtime_seconds": 248.0318553000002,
+  "initial_losses": {
+    "total_loss": 1.3006575107574463,
+    "pde_loss": 1.083930492401123,
+    "bc_loss": 0.21672704815864563
+  },
+  "final_losses": {
+    "total_loss": 3.347615711390972e-05,
+    "pde_loss": 1.0252168067381717e-05,
+    "bc_loss": 2.3223989046528004e-05
+  },
+  "diagnostics": {
+    "final_pde_loss": 1.0252168067381717e-05,
+    "final_boundary_loss": 2.3223989046528004e-05,
+    "test_residual_mean_absolute": 0.002016803016886115,
+    "test_residual_max_absolute": 0.04044663906097412
+  },
+  "reference_metrics": {
+    "mean_squared_error": 3.6224340655327702e-06,
+    "relative_l2_error": 0.011655501775912652,
+    "max_absolute_error": 0.01742997020483017
+  },
+  "finite_values": true,
+  "array_output": "results\\heat_baseline_matched_10000ep_lr_0001.npz",
+  "metrics_output": "results\\heat_baseline_matched_10000ep_lr_0001.json"
+}
