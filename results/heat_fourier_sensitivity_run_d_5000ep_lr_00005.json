@@ -1,0 +1,51 @@
+{
+  "run": "D",
+  "configuration": {
+    "n_interior": 1500,
+    "n_boundary": 500,
+    "n_test": 10000,
+    "seed": 2026,
+    "device": "cpu",
+    "hidden_layers": 3,
+    "hidden_units": 32,
+    "activation": "tanh",
+    "initializer": "glorot_normal",
+    "epochs": 5000,
+    "learning_rate": 0.0005,
+    "log_every": 100,
+    "pde_weight": 1.0,
+    "boundary_weight": 1.0,
+    "reference_path": "D:\\Shreya\\PESU\\YEAR3\\SEM5\\ML\\mini_proj\\codebase\\ml-pinn-project\\results\\heat_fem_reference.npz",
+    "model": "fourier",
+    "num_fourier_features": 64,
+    "fourier_scale": 1.0,
+    "trainable_fourier": false
+  },
+  "actual_epochs_completed": 5000,
+  "actual_learning_rate": 0.0005,
+  "runtime_seconds": 310.1401613000003,
+  "initial_losses": {
+    "total_loss": 9070.3720703125,
+    "pde_loss": 9069.869140625,
+    "bc_loss": 0.5025923848152161
+  },
+  "final_losses": {
+    "total_loss": 0.06707072257995605,
+    "pde_loss": 0.06316349655389786,
+    "bc_loss": 0.003907229285687208
+  },
+  "diagnostics": {
+    "final_pde_loss": 0.06316349655389786,
+    "final_boundary_loss": 0.003907229285687208,
+    "test_residual_mean_absolute": 2.552401065826416,
+    "test_residual_max_absolute": 43.377105712890625
+  },
+  "reference_metrics": {
+    "mean_squared_error": 0.036925555052489095,
+    "relative_l2_error": 1.1767772025920256,
+    "max_absolute_error": 0.38174664483850795
+  },
+  "finite_values": true,
+  "array_output": "results\\heat_fourier_sensitivity_run_d_5000ep_lr_00005.npz",
+  "metrics_output": "results\\heat_fourier_sensitivity_run_d_5000ep_lr_00005.json"
+}
