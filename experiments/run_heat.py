@@ -13,6 +13,12 @@ from pinn.derivatives import nth_derivative
 from pinn.losses import PINNLoss, mse_loss, residual_loss
 from pinn.trainer import PINNTrainer
 from problems.heat_2d import Heat2DProblem
+from evaluation.metrics import (
+    max_absolute_error,
+    mean_squared_error,
+    relative_l2_error,
+)
+from evaluation.reference_solutions import load_heat_fem_reference
 
 
 @dataclass(frozen=True)
@@ -33,6 +39,7 @@ class HeatExperimentConfig:
     log_every: int = 5
     pde_weight: float = 1.0
     boundary_weight: float = 1.0
+    reference_path: Optional[str] = None
 
 
 @dataclass
@@ -147,6 +154,18 @@ def run_heat_experiment(
         "final_boundary_loss": history["bc_loss"][-1],
     }
     diagnostics.update(_test_residual_statistics(model, test_tensor, problem))
+    reference_metrics = None
+    if config.reference_path is not None:
+        reference_coordinates, reference_values, _ = load_heat_fem_reference(
+            config.reference_path, problem=problem
+        )
+        if not np.array_equal(reference_coordinates, test):
+            raise ValueError("reference coordinates do not match experiment test points")
+        reference_metrics = {
+            "mean_squared_error": mean_squared_error(reference_values, predictions),
+            "relative_l2_error": relative_l2_error(reference_values, predictions),
+            "max_absolute_error": max_absolute_error(reference_values, predictions),
+        }
 
     return HeatExperimentResult(
         model=model,
@@ -154,6 +173,7 @@ def run_heat_experiment(
         test_coordinates=test,
         predictions=predictions,
         diagnostics=diagnostics,
+        reference_metrics=reference_metrics,
     )
 
 
