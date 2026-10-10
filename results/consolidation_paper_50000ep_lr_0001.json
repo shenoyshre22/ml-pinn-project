@@ -1,0 +1,51 @@
+{
+  "experiment": "consolidation",
+  "configuration": {
+    "time_max": 0.5,
+    "n_interior": 500,
+    "n_spatial_boundary": 250,
+    "n_initial": 125,
+    "n_test": 10011,
+    "seed": 2026,
+    "device": "cpu",
+    "hidden_layers": 5,
+    "hidden_units": 50,
+    "activation": "tanh",
+    "initializer": "glorot_normal",
+    "epochs": 50000,
+    "learning_rate": 0.001,
+    "log_every": 1000,
+    "pde_weight": 0.25,
+    "condition_weight": 0.25,
+    "reference_terms": 100,
+    "output_transform_x": true,
+    "lbfgs_enabled": true,
+    "lbfgs_max_iter": 50000,
+    "lbfgs_log_every": 1000,
+    "output_path": "results/consolidation_paper_50000ep_lr_0001.json",
+    "checkpoint_dir": "checkpoints/consolidation_paper_full",
+    "checkpoint_every": 100,
+    "resume_from": null
+  },
+  "runtime_seconds": 1046.6796996110006,
+  "actual_epochs_completed": 50500,
+  "training_stages": {
+    "adam_epochs": 50000,
+    "lbfgs_enabled": true,
+    "lbfgs_max_iter": 50000
+  },
+  "metrics": {
+    "mean_squared_error": 0.00013880946614802124,
+    "relative_l2_error": 0.021213802866667016,
+    "max_absolute_error": 0.39142303302150355
+  },
+  "final_losses": {
+    "total_loss": 0.0005214224802330136,
+    "pde_loss": 2.0138522813795134e-06,
+    "bc_loss": 0.002083676168695092,
+    "data_loss": 0.0
+  },
+  "finite_values": true,
+  "output_npz": "results/consolidation_paper_50000ep_lr_0001.npz",
+  "checkpoint_directory": "checkpoints/consolidation_paper_full"
+}
