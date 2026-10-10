@@ -34,14 +34,28 @@ class FourierFeatureMapping(nn.Module):
         num_features: int,
         scale: float = 1.0,
         trainable: bool = False,
+        seed: Optional[int] = None,
     ) -> None:
         super().__init__()
+        if input_dim < 1:
+            raise ValueError("input_dim must be at least 1")
+        if num_features < 1:
+            raise ValueError("num_features must be at least 1")
+        if scale < 0:
+            raise ValueError("scale must be non-negative")
         self.input_dim = input_dim
         self.num_features = num_features
         self.scale = scale
 
         # Sample Gaussian random matrix B of shape (num_features, input_dim)
-        B = torch.randn(num_features, input_dim) * scale
+        if seed is None:
+            B = torch.randn(num_features, input_dim) * scale
+        else:
+            generator = torch.Generator(device="cpu")
+            generator.manual_seed(seed)
+            B = torch.randn(
+                num_features, input_dim, generator=generator
+            ) * scale
         if trainable:
             self.B = nn.Parameter(B)
         else:
@@ -93,6 +107,7 @@ class FourierFeaturePINN(nn.Module):
         initializer: str = "glorot_normal",
         output_transform: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
         trainable_fourier: bool = False,
+        fourier_seed: Optional[int] = None,
     ) -> None:
         super().__init__()
         self.fourier_map = FourierFeatureMapping(
@@ -100,6 +115,7 @@ class FourierFeaturePINN(nn.Module):
             num_features=num_fourier_features,
             scale=fourier_scale,
             trainable=trainable_fourier,
+            seed=fourier_seed,
         )
         mlp_input_dim = 2 * num_fourier_features
         self.net = MLP(

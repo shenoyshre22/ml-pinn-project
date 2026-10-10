@@ -7,8 +7,10 @@ from typing import Dict, List, Optional, Union
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 from models.baseline_pinn import BaselinePINN
+from models.fourier_feature_pinn import FourierFeaturePINN
 from pinn.derivatives import nth_derivative
 from pinn.losses import PINNLoss, mse_loss, residual_loss
 from pinn.trainer import PINNTrainer
@@ -40,13 +42,17 @@ class HeatExperimentConfig:
     pde_weight: float = 1.0
     boundary_weight: float = 1.0
     reference_path: Optional[str] = None
+    model: str = "baseline"
+    num_fourier_features: int = 64
+    fourier_scale: float = 1.0
+    trainable_fourier: bool = False
 
 
 @dataclass
 class HeatExperimentResult:
     """Trained heat model, predictions, and reference-free diagnostics."""
 
-    model: BaselinePINN
+    model: nn.Module
     history: Dict[str, List[float]]
     test_coordinates: np.ndarray = field(repr=False)
     predictions: np.ndarray = field(repr=False)
@@ -55,7 +61,7 @@ class HeatExperimentResult:
 
 
 def _test_residual_statistics(
-    model: BaselinePINN,
+    model: nn.Module,
     test_tensor: torch.Tensor,
     problem: Heat2DProblem,
 ) -> Dict[str, float]:
@@ -103,14 +109,34 @@ def run_heat_experiment(
     )
     test_tensor = torch.tensor(test, dtype=torch.float32, device=device)
 
-    model = BaselinePINN(
-        input_dim=2,
-        output_dim=1,
-        hidden_layers=config.hidden_layers,
-        hidden_units=config.hidden_units,
-        activation=config.activation,
-        initializer=config.initializer,
-    )
+    model_name = config.model.lower().strip()
+    if model_name == "baseline":
+        model: nn.Module = BaselinePINN(
+            input_dim=2,
+            output_dim=1,
+            hidden_layers=config.hidden_layers,
+            hidden_units=config.hidden_units,
+            activation=config.activation,
+            initializer=config.initializer,
+        )
+    elif model_name == "fourier":
+        model = FourierFeaturePINN(
+            input_dim=2,
+            output_dim=1,
+            num_fourier_features=config.num_fourier_features,
+            fourier_scale=config.fourier_scale,
+            hidden_layers=config.hidden_layers,
+            hidden_units=config.hidden_units,
+            activation=config.activation,
+            initializer=config.initializer,
+            trainable_fourier=config.trainable_fourier,
+            fourier_seed=config.seed,
+        )
+    else:
+        raise ValueError(
+            f"Unsupported heat model '{config.model}'. "
+            "Expected 'baseline' or 'fourier'."
+        )
     trainer = PINNTrainer(
         model=model,
         loss_fn=PINNLoss(

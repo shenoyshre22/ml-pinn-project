@@ -14,3 +14,7 @@ log_every: 100
 pde_weight: 1.0
 boundary_weight: 1.0
 reference_path: results/heat_fem_reference.npz
+model: baseline
+num_fourier_features: 64
+fourier_scale: 1.0
+trainable_fourier: false

@@ -39,3 +39,10 @@ Fourier Feature PINN
 - `results/` — Experiment results
 - `figures/` — Generated figures
 - `docs/` — Project documentation
+
+The heat runner supports both `model: baseline` and `model: fourier`.
+The Fourier configuration uses a fixed Gaussian frequency matrix and maps each
+coordinate to sine and cosine features before the same downstream MLP. See
+`configs/heat_fourier.yaml` for the reproducible 20,000-epoch comparison
+configuration. The full training run is intentionally separate from the
+baseline results.
