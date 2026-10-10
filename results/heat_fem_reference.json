@@ -1,0 +1,74 @@
+{
+  "reference_type": "independently_generated_structured_linear_triangular_fem",
+  "not_dealii_output": true,
+  "pde": "T_xx + T_yy + 1 = 0 (equivalent to -Delta T = 1)",
+  "domain": {
+    "x": [
+      -1.0,
+      1.0
+    ],
+    "y": [
+      -1.0,
+      1.0
+    ]
+  },
+  "boundary_conditions": "T = 0 on all four boundaries",
+  "finite_element": "continuous piecewise-linear (P1) triangular elements",
+  "mesh": "uniform structured square grid split into two triangles per cell",
+  "refinement_levels": [
+    {
+      "subdivisions_per_axis": 8,
+      "triangles": 128,
+      "nodes": 81,
+      "runtime_seconds": 0.2033921000547707,
+      "linear_system_residual_inf": 2.1510571102112408e-16,
+      "test_value_min": 0.0,
+      "test_value_max": 0.2899096665181223,
+      "test_value_change_from_previous_max_abs": null
+    },
+    {
+      "subdivisions_per_axis": 16,
+      "triangles": 512,
+      "nodes": 289,
+      "runtime_seconds": 0.1936100001912564,
+      "linear_system_residual_inf": 3.122502256758253e-16,
+      "test_value_min": 0.0,
+      "test_value_max": 0.2931570999268877,
+      "test_value_change_from_previous_max_abs": 0.023221827638151383
+    },
+    {
+      "subdivisions_per_axis": 32,
+      "triangles": 2048,
+      "nodes": 1089,
+      "runtime_seconds": 0.44050060003064573,
+      "linear_system_residual_inf": 5.004677228193088e-16,
+      "test_value_min": 0.0,
+      "test_value_max": 0.2941439658281542,
+      "test_value_change_from_previous_max_abs": 0.007427526306534952
+    },
+    {
+      "subdivisions_per_axis": 64,
+      "triangles": 8192,
+      "nodes": 4225,
+      "runtime_seconds": 1.5355487000197172,
+      "linear_system_residual_inf": 6.662422349923425e-16,
+      "test_value_min": 0.0,
+      "test_value_max": 0.29447099795449955,
+      "test_value_change_from_previous_max_abs": 0.0015565569027275814
+    }
+  ],
+  "final_subdivisions_per_axis": 64,
+  "final_nodes": 4225,
+  "final_triangles": 8192,
+  "linear_solver": "scipy.sparse.linalg.spsolve on the reduced interior system",
+  "linear_solver_tolerance": "direct sparse solve; measured assembled-system infinity-norm residual is recorded per level",
+  "test_grid": "Heat2DProblem.sample_test_points(n_test=10000), 100x100, meshgrid(indexing=\"xy\"), row-major ravel order",
+  "coordinate_order": "(x, y), coordinates and values have one-to-one row correspondence",
+  "software": {
+    "python": "3.13.12",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1"
+  },
+  "regeneration": "Call generate_structured_fem_reference(Heat2DProblem(n_test=10000).sample_test_points(), subdivisions=64) and save_fem_reference(...) from evaluation.reference_solutions.",
+  "convergence_observation": "Final mesh selected after successive refinement changes were measured; values are not claimed to be exact or deal.II results."
+}

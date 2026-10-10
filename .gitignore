@@ -27,9 +27,7 @@ Thumbs.db
 *.pth
 *.ckpt
 
-# Generated experiment outputs
-results/*
-figures/*
+
 
 # Keep directory structure
 !results/.gitkeep
