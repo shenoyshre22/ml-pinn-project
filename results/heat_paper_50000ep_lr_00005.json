@@ -1,0 +1,54 @@
+{
+  "experiment": "baseline",
+  "configuration": {
+    "n_interior": 1500,
+    "n_boundary": 500,
+    "n_test": 10000,
+    "seed": 2026,
+    "device": "cpu",
+    "hidden_layers": 4,
+    "hidden_units": 50,
+    "activation": "tanh",
+    "initializer": "glorot_uniform",
+    "epochs": 50000,
+    "learning_rate": 0.0005,
+    "log_every": 1000,
+    "pde_weight": 0.5,
+    "boundary_weight": 0.5,
+    "reference_path": "results/heat_fem_reference.npz",
+    "model": "baseline",
+    "num_fourier_features": 64,
+    "fourier_scale": 1.0,
+    "trainable_fourier": false,
+    "lbfgs_enabled": true,
+    "lbfgs_max_iter": 50000,
+    "lbfgs_log_every": 1000,
+    "output_path": "results/heat_paper_50000ep_lr_00005.json"
+  },
+  "runtime_seconds": 1699.776075655,
+  "actual_epochs_completed": 50001,
+  "training_stages": {
+    "adam_epochs": 50000,
+    "lbfgs_enabled": true,
+    "lbfgs_max_iter": 50000
+  },
+  "diagnostics": {
+    "final_pde_loss": 2.1462221411638893e-05,
+    "final_boundary_loss": 2.6959336537402123e-05,
+    "test_residual_mean_absolute": 0.0007974632317200303,
+    "test_residual_max_absolute": 0.021777033805847168
+  },
+  "reference_metrics": {
+    "mean_squared_error": 3.1516743081046033e-06,
+    "relative_l2_error": 0.010871798536047429,
+    "max_absolute_error": 0.014148913323879242
+  },
+  "final_losses": {
+    "total_loss": 2.4210778065025806e-05,
+    "pde_loss": 2.1462221411638893e-05,
+    "bc_loss": 2.6959336537402123e-05,
+    "data_loss": 0.0
+  },
+  "finite_values": true,
+  "output_npz": "results/heat_paper_50000ep_lr_00005.npz"
+}
