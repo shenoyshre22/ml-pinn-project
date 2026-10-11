@@ -1,0 +1,54 @@
+{
+  "experiment": "fourier",
+  "configuration": {
+    "n_interior": 1500,
+    "n_boundary": 500,
+    "n_test": 10000,
+    "seed": 2026,
+    "device": "cpu",
+    "hidden_layers": 3,
+    "hidden_units": 32,
+    "activation": "tanh",
+    "initializer": "glorot_normal",
+    "epochs": 20000,
+    "learning_rate": 0.001,
+    "log_every": 100,
+    "pde_weight": 1.0,
+    "boundary_weight": 1.0,
+    "reference_path": "results/heat_fem_reference.npz",
+    "model": "fourier",
+    "num_fourier_features": 64,
+    "fourier_scale": 1.0,
+    "trainable_fourier": false,
+    "lbfgs_enabled": false,
+    "lbfgs_max_iter": 50000,
+    "lbfgs_log_every": 100,
+    "output_path": "results/heat_fourier_20000ep_lr_001.json"
+  },
+  "runtime_seconds": 710.2671405709998,
+  "actual_epochs_completed": 20000,
+  "training_stages": {
+    "adam_epochs": 20000,
+    "lbfgs_enabled": false,
+    "lbfgs_max_iter": 0
+  },
+  "diagnostics": {
+    "final_pde_loss": 0.0037144955713301897,
+    "final_boundary_loss": 6.331248732749373e-05,
+    "test_residual_mean_absolute": 0.8894454836845398,
+    "test_residual_max_absolute": 38.12858581542969
+  },
+  "reference_metrics": {
+    "mean_squared_error": 0.012943231316328786,
+    "relative_l2_error": 0.696710068228918,
+    "max_absolute_error": 0.2609556709362813
+  },
+  "final_losses": {
+    "total_loss": 0.003777808044105768,
+    "pde_loss": 0.0037144955713301897,
+    "bc_loss": 6.331248732749373e-05,
+    "data_loss": 0.0
+  },
+  "finite_values": true,
+  "output_npz": "results/heat_fourier_20000ep_lr_001.npz"
+}
