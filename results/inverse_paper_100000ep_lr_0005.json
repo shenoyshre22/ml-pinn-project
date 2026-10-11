@@ -1,0 +1,58 @@
+{
+  "experiment": "inverse_structural_dynamics",
+  "configuration": {
+    "time_max": 10.0,
+    "n_observations": 50,
+    "n_residual": 100,
+    "n_initial": 50,
+    "n_test": 10000,
+    "seed": 2026,
+    "device": "cpu",
+    "hidden_layers": 3,
+    "hidden_units": 32,
+    "activation": "tanh",
+    "initializer": "glorot_uniform",
+    "epochs": 100000,
+    "learning_rate": 0.0005,
+    "log_every": 1000,
+    "pde_weight": 0.25,
+    "condition_weight": 0.25,
+    "data_weight": 0.25,
+    "initial_damping": 0.2,
+    "initial_stiffness": 3.0,
+    "true_mass": 1.0,
+    "true_damping": 0.4,
+    "true_stiffness": 4.0,
+    "initial_displacement": 1.0,
+    "initial_velocity": 1.0,
+    "paper_reported_damping": 0.40125215,
+    "paper_reported_stiffness": 3.9933197,
+    "output_path": "results/inverse_paper_100000ep_lr_0005.json"
+  },
+  "runtime_seconds": 549.527356345,
+  "actual_epochs_completed": 100000,
+  "learned_parameters": {
+    "damping": 0.3995361626148224,
+    "stiffness": 4.000827789306641
+  },
+  "parameter_errors": {
+    "damping_absolute_error": 0.0004638373851776345,
+    "stiffness_absolute_error": 0.000827789306640625,
+    "damping_error_vs_paper": 0.0017159873851775864,
+    "stiffness_error_vs_paper": 0.007508089306640819
+  },
+  "initial_losses": {
+    "total_loss": 0.3197786509990692,
+    "pde_loss": 0.08839626610279083,
+    "bc_loss": 0.9902980327606201,
+    "data_loss": 0.20042024552822113
+  },
+  "final_losses": {
+    "total_loss": 3.1679780931881396e-07,
+    "pde_loss": 1.2174946277809795e-06,
+    "bc_loss": 9.746747853256466e-10,
+    "data_loss": 4.872191894378375e-08
+  },
+  "finite_values": true,
+  "output_npz": "results/inverse_paper_100000ep_lr_0005.npz"
+}
