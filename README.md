@@ -14,8 +14,8 @@ REPRODUCE → VALIDATE → ADD ONE MODEL → COMPARE
 
 | Name | SRN |
 |------|-----|
-| Shashank A | PESU2G24CS461 |
 | Shreya Shenoy | PES2UG24CS487 |
+| Shashank A | PESU2G24CS461 |
 
 ## Reference Experiments
 
